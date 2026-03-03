@@ -1,39 +1,42 @@
 import pygame
 from world.environment import Wall
+import random
 from config import WIDTH, HEIGHT
+from characters.enemies.hamster import SmallHamster, GigaHamster
 
 class DisappearingPlatform(pygame.sprite.Sprite):
-    """Платформа, которая исчезает после касания или попадания"""
     def __init__(self, x, y, w, h, color, game):
         super().__init__()
         self.game = game
+        self.base_color = color
         self.image = pygame.Surface((w, h))
-        self.image.fill(color)
-        # Добавим золотистую обводку для стиля
-        pygame.draw.rect(self.image, (255, 215, 0), self.image.get_rect(), 2)
-        
         self.rect = self.image.get_rect(topleft=(x, y))
+        
         self.active = True
         self.timer = 0
-        self.respawn_delay = 180 # 3 секунды при 60 FPS
+        self.respawn_delay = 300 # 5 секунд на восстановление
+        self.life_timer = random.randint(200, 400) # Время жизни платформы (3-6 сек)
 
     def update(self):
         if not self.active:
             self.timer -= 1
             if self.timer <= 0:
-                self.active = True
-                self.game.walls.add(self)
-                self.game.all_sprites.add(self) # ДОБАВИТЬ ЭТО, чтобы она снова появилась на экране
+                self.reset_platform()
         else:
-            # Исчезает при касании игрока
-            if self.rect.colliderect(self.game.player.rect):
-                # Проверка: игрок должен быть сверху платформы, чтобы она «сработала»
-                if self.game.player.vel_y > 0 and self.game.player.rect.bottom <= self.rect.bottom + 10:
-                    self.vanish()
+            # 1. Естественный износ (платформа мерцает перед исчезновением)
+            self.life_timer -= 1
+            if self.life_timer < 60:
+                # Мерцание в последнюю секунду
+                alpha = 255 if self.life_timer % 10 < 5 else 0
+                self.image.set_alpha(alpha)
             
-            # Или при попадании снарядов
-            for projectile in self.game.combat_system.projectiles:
-                if self.rect.colliderect(projectile.rect):
+            if self.life_timer <= 0:
+                self.vanish()
+
+            # 2. Проверка столкновения с Лучом (из группы projectiles)
+            hits = pygame.sprite.spritecollide(self, self.game.combat_system.projectiles, False)
+            for proj in hits:
+                if proj.damage > 30: # Только мощные атаки (как луч) ломают платформу
                     self.vanish()
 
     def vanish(self):
@@ -43,79 +46,75 @@ class DisappearingPlatform(pygame.sprite.Sprite):
             self.game.walls.remove(self)
             self.game.all_sprites.remove(self)
 
-    def draw(self, screen):
-        if self.active:
-            # Рисуем с учетом камеры
-            screen.blit(self.image, self.game.camera.apply(self))
+    def reset_platform(self):
+        self.active = True
+        self.life_timer = random.randint(200, 400)
+        self.image.set_alpha(255)
+        self.game.walls.add(self)
+        self.game.all_sprites.add(self)
 
 class FinalGenerator:
-    """Генератор финальных локаций: Коридор Суда и Золотая Арена"""
     def __init__(self, game):
         self.game = game
 
     def generate(self, name):
+        """Центральный метод выбора генерации"""
         if name == "FinalCorridor":
             self._build_corridor()
         elif name == "FinalArena":
             self._build_arena()
 
     def _build_corridor(self):
-        """Создание длинного величественного коридора (Walk of Judgment)"""
-        length = 6000 # Сделаем его еще длиннее для атмосферы
+        """Создание Коридора Суда со стражем"""
+        length = 6000 
         self.game.level_width = length
         self.game.init_camera(length, HEIGHT)
         
-        # 1. Пол (Белый мрамор с золотом)
-        floor = Wall(0, HEIGHT - 100, length, 100, (245, 245, 240))
-        self.game.walls.add(floor)
-        self.game.all_sprites.add(floor)
-
-        # 2. Потолок
+        # 1. Пол и Потолок
+        floor = Wall(0, HEIGHT - 100, length, 100, (140, 140, 130))
         ceiling = Wall(0, 0, length, 100, (200, 200, 190))
-        self.game.walls.add(ceiling)
-        self.game.all_sprites.add(ceiling)
+        self.game.walls.add(floor, ceiling)
+        self.game.all_sprites.add(floor, ceiling)
 
-        # 3. Декорации: Колонны на заднем фоне
-        # Мы добавляем их в all_sprites, но НЕ в walls, чтобы сквозь них можно было ходить
+        # 2. Декорации (Колонны)
         for x in range(400, length, 800):
-            # Тень колонны
             pillar_shadow = Wall(x-20, 100, 100, HEIGHT-200, (220, 220, 210))
-            # Сама колонна (чуть светлее)
             pillar = Wall(x, 100, 60, HEIGHT-200, (255, 255, 250))
-            
-            self.game.all_sprites.add(pillar_shadow)
-            self.game.all_sprites.add(pillar)
+            self.game.all_sprites.add(pillar_shadow, pillar)
 
-        # 4. Окна / Источники света (Визуальный эффект)
-        for x in range(800, length, 1600):
-            window = Wall(x, 150, 300, 400, (255, 253, 220)) # Свет из окон
-            self.game.all_sprites.add(window)
+        # 3. СПАВН СТРАЖА (Мини-Хомяк)
+        # Ставим его примерно на 3/4 пути (4500px)
+        # ИСПРАВЛЕНИЕ ТУТ:
+        # Спавним SmallHamster (того самого, который 'Minster')
+        monster = SmallHamster(4500, HEIGHT - 200, self.game.player, self.game)
+        monster.name = "Minster"  # Оставляем имя для логики двери в main.py
+        
+        self.game.enemies.add(monster)
+        self.game.all_sprites.add(monster)
+        print("SYSTEM: Страж 'Minster' (SmallHamster) заспавнен.")  # ТО САМОЕ ИМЯ ДЛЯ ОБНАРУЖЕНИЯ В main.py
+        monster.hp = 1000         # Сделаем его чуть крепче обычного моба
+        self.game.enemies.add(monster)
+        self.game.all_sprites.add(monster)
+        print("SYSTEM: Страж 'Minster' заспавнен в коридоре.")
 
-        # 5. Финальные врата в конце
+        # 4. Финальные врата (Визуальный триггер)
         gate = Wall(length - 150, HEIGHT - 400, 100, 300, (255, 215, 0))
         self.game.all_sprites.add(gate)
-        # Сохраняем ссылку на врата для StageManager, если нужно
-        self.game.exit_gate = gate
 
     def _build_arena(self):
-        self.game.walls.empty() # На всякий случай
-        """Золотой Колизей для битвы с ГигаХомяком"""
+        """Создание Арены для битвы с Боссом"""
         self.game.level_width = WIDTH
         self.game.init_camera(WIDTH, HEIGHT)
         
-        # 1. Пол
+        # 1. Пол (Золотой)
         floor = Wall(0, HEIGHT - 100, WIDTH, 100, (255, 215, 0))
         self.game.walls.add(floor)
-        self.game.all_sprites.add(floor) # Это было на месте
+        self.game.all_sprites.add(floor)
 
-        # 2. Боковые ограничители (НЕВИДИМЫЕ СТЕНЫ)
+        # 2. Невидимые стены по бокам
         left_wall = Wall(-20, 0, 20, HEIGHT, (0, 0, 0))
         right_wall = Wall(WIDTH, 0, 20, HEIGHT, (0, 0, 0))
         self.game.walls.add(left_wall, right_wall)
-        # СОВЕТ: Если хочешь их видеть, добавь их в all_sprites. 
-        # Если хочешь, чтобы они были просто преградой — оставь так.
-        self.game.all_sprites.add(left_wall) 
-        self.game.all_sprites.add(right_wall)
 
         # 3. Исчезающие платформы
         platform_positions = [
@@ -124,8 +123,21 @@ class FinalGenerator:
             (WIDTH // 3, HEIGHT - 500),
             (WIDTH // 3 * 2, HEIGHT - 500)
         ]
-        
         for pos in platform_positions:
             p = DisappearingPlatform(pos[0], pos[1], 200, 25, (255, 255, 255), self.game)
+            self.game.all_sprites.add(p)
             self.game.walls.add(p)
-            self.game.all_sprites.add(p) # Проверь, чтобы эта строка была тут!
+
+        # 4. СПАВН БОЛЬШОГО ХОМЯКА
+        boss = GigaHamster(WIDTH // 2, HEIGHT - 300, self.game.player, self.game)
+        boss.game = self.game
+        boss.name = "MegaHamster"
+        boss.max_hp = 5000
+        boss.hp = 5000
+        # Если есть механика увеличения спрайта:
+        # boss.image = pygame.transform.scale(boss.image, (150, 150))
+        # boss.rect = boss.image.get_rect(center=boss.rect.center)
+        
+        self.game.enemies.add(boss)
+        self.game.all_sprites.add(boss)
+        print("SYSTEM: МЕГА ХОМЯК ПРИБЫЛ!")

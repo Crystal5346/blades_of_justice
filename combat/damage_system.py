@@ -54,6 +54,12 @@ class Projectile(pygame.sprite.Sprite):
             # Если не пронзает — уничтожается. Валун Husk7 теперь всегда уничтожается.
             if not self.pierce:
                 self.kill()
+                
+        # В Projectile.update
+        if hasattr(self, 'is_warning_phase') and self.is_warning_phase:
+            self.image.set_alpha(100) # Прозрачный
+        else:
+            self.image.set_alpha(255) # Опасный
 
         # Удаление за границами
         if self.game:
@@ -63,6 +69,7 @@ class Projectile(pygame.sprite.Sprite):
 class CombatSystem:
     def __init__(self, game):
         self.game = game
+        self.projectiles = pygame.sprite.Group()
 
     def spawn_projectile(self, pos, target_pos, damage, is_spear=False, targets=None, color=None, size=(25, 25)):
         """Стандартный снаряд для Габриэля и мелких врагов"""
@@ -75,6 +82,7 @@ class CombatSystem:
         proj = Projectile(x, y, target_pos, damage, speed, color, targets, 
                           pierce=is_spear, size=size, game=self.game)
         self.game.all_sprites.add(proj)
+        self.projectiles.add(proj)
 
     def spawn_heavy_projectile(self, pos, target_pos, damage):
         """Тяжелый валун для Husk7 (Greed)"""
@@ -89,6 +97,7 @@ class CombatSystem:
             game=self.game
         )
         self.game.all_sprites.add(proj)
+        self.projectiles.add(proj)
 
     def apply_area_buff(self, pos, radius, buff_amount):
         for enemy in self.game.enemies:

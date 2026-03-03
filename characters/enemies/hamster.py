@@ -115,14 +115,28 @@ class GigaHamster(Enemy):
             self.rect.x += (1 if dist_x > 0 else -1) * self.speed
 
     def perform_beam(self):
-        """Луч: босс замирает и выпускает снаряды (или область урона)"""
-        # Каждые 10 кадров создаем вспышку света
-        if self.action_duration % 10 == 0:
-            # Здесь можно спавнить HomingProjectile как у Миноса
-            pass 
-        
-        # Визуальный эффект 'зарядки' (дрожание)
-        self.rect.x += random.randint(-2, 2)
+        """Логика динамического луча"""
+        if self.action_duration > 70:
+            # ФАЗА 1: Прицеливание (замирает и фиксирует позицию игрока)
+            if self.action_duration == 99:
+                self.beam_target_pos = (self.target.rect.centerx, self.target.rect.centery)
+            self.rect.x += random.randint(-3, 3) # Эффект дрожания при зарядке
+            
+        elif self.action_duration == 70:
+            # ФАЗА 2: Момент выстрела (создаем объект луча)
+            self.spawn_mega_beam()
+            
+    def spawn_mega_beam(self):
+        # Используем твой CombatSystem для создания луча
+        # Передаем координаты Хомяка и зафиксированную точку цели
+        self.game.combat_system.spawn_projectile(
+            self.rect.center, 
+            self.beam_target_pos, 
+            damage=40, 
+            is_spear=True, # Используем pierce=True для луча
+            color=(255, 50, 50), # Красный лазер
+            size=(800, 40) # Очень длинный и широкий луч
+        )
 
     def die(self):
         print("ПОБЕДА: Святой Хомяк повержен. Габриэль исполнил свой долг.")

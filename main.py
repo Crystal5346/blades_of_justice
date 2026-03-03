@@ -38,6 +38,9 @@ class Game:
         self.hud = None
         self.camera = None
         self.enemies = pygame.sprite.Group()
+        self.mini_hamster_dead = False
+        self.boss_loading_started = False
+        self.loading_timer = 0
         self.all_sprites = pygame.sprite.Group()
         self.walls = pygame.sprite.Group()
 
@@ -46,32 +49,43 @@ class Game:
         self.camera = Camera(width, height)
         return self.camera
 
-    def init_world(self, stage_name="Polygon"):
+    def init_world(self, stage_name="FinalCorridor"):
         self.state = 'LOADING'
         
-        # 1. Очистка старого мира
+        # 1. Если игрока НЕТ в памяти, пробуем достать его из базы или создать
+        if self.player is None:
+            print(f"DEBUG: Игрок потерян! Пытаемся восстановить...")
+            # Пытаемся загрузить данные из последнего слота
+            saved_stats = self.db.get_player_stats(self.current_slot) if self.current_slot else None
+            
+            self.player = Gabriel(200, HEIGHT - 300)
+            self.player.game = self
+            
+            # Если в базе что-то было — возвращаем честно заработанное
+            if saved_stats:
+                self.player.level = saved_stats.get('level', 1)
+                self.player.exp = saved_stats.get('exp', 0)
+                self.player.hp = saved_stats.get('hp', self.player.max_hp)
+                self.player.refresh_abilities()
+                print(f"DEBUG: Статы восстановлены из БД. Уровень: {self.player.level}")
+        
+        # 2. Теперь, когда игрок ТОЧНО есть, чистим мир
         self.all_sprites.empty()
         self.walls.empty()
         self.enemies.empty()
 
-        # 2. Игрок
-        if self.player is None:
-            self.player = Gabriel(100, 100)
-            self.player.game = self
-        
-        # 3. Загрузка уровня (Создание стен)
+        # 3. Возвращаем нашего (уже существующего или только что воскрешенного) игрока
+        self.all_sprites.add(self.player)
+        self.player.rect.topleft = (200, HEIGHT - 300)
+        self.player.vel_y = 0
+
+        # 4. Загружаем уровень
         self.stage_manager.load_stage(stage_name)
-
-        # 4. СТОП-КРАН для падения
-        # Ставим игрока в координаты, где ТОЧНО есть пол (HEIGHT - 100)
-        self.player.rect.x = 200
-        self.player.rect.y = HEIGHT - 300 
-        self.player.vel_y = 0 # Сбрасываем накопленную скорость падения
         
-        # 5. Принудительный рендер камеры, чтобы она не смотрела в (0,0)
-        if self.camera:
-            self.camera.update(self.player)
-
+        # 5. Обновляем HUD
+        self.hud = HUD(self.screen, self.player)
+        
+        print(f"DEBUG: Загрузка {stage_name} завершена. Итоговый уровень: {self.player.level}")
         self.state = 'PLAYING'
 
     def handle_events(self):
@@ -152,36 +166,57 @@ class Game:
         self.db.save_game(self.current_slot, stats_to_save)
 
     def update(self):
-        # Состояние катсцены (после смерти босса)
+        # 1. Если идет загрузка босса — считаем таймер
+        if self.boss_loading_started and self.state == 'LOADING':
+            now = pygame.time.get_ticks()
+            elapsed = (now - self.loading_timer) / 1000 
+            
+            if elapsed >= 10: 
+                self.boss_loading_started = False
+                self.init_world("FinalArena") # Тут заспавнится Большой Хомяк
+            return # Пока грузимся, остальной апдейт не нужен
+
+        # 2. Состояние меню/паузы/катсцены
         if self.state in ['MENU', 'PAUSE', 'GAMEOVER', 'CUTSCENE']:
             if self.state == 'CUTSCENE':
-                # Получаем клавиши, даже если не двигаемся (чтобы не было ошибок)
                 keys = pygame.key.get_pressed() 
                 for sprite in self.all_sprites:
                     if sprite == self.player:
-                        # Передаем клавиши игроку, даже в катсцене
                         sprite.update(keys) 
                     else:
-                        # Враги и прочее обновляются как обычно
                         sprite.update()
-                
                 if self.camera: 
                     self.camera.update(self.player)
             return
-
-        # Обычное состояние игры
+            
+        # 3. ОБЫЧНОЕ СОСТОЯНИЕ ИГРЫ (PLAYING)
         keys = pygame.key.get_pressed()
-        
-        # 1. Обновляем игрока
+
+        # Проверка условий перехода на Арену
+        if self.stage_manager.current_stage == "FinalCorridor":
+            # Проверка смерти Мини-Хомяка
+            if not self.mini_hamster_dead:
+                minsters = [e for e in self.enemies if getattr(e, 'name', '') == "Minster"]
+                if not minsters: 
+                    self.mini_hamster_dead = True
+                    print("СИСТЕМА: Страж пал. Врата Арены разблокированы.")
+
+            # Проверка приближения к двери (если страж убит)
+            if self.mini_hamster_dead and not self.boss_loading_started:
+                if self.player.rect.x > 5750:
+                    self.boss_loading_started = True
+                    self.loading_timer = pygame.time.get_ticks()
+                    self.state = 'LOADING'
+                    print("СИСТЕМА: Подготовка Арены...")
+
+        # Стандартное обновление спрайтов
         if self.player:
             self.player.update(keys) 
         
-        # 2. Обновляем всех остальных
         for sprite in self.all_sprites:
             if sprite != self.player:
                 sprite.update() 
         
-        # 3. Камера и системы
         if self.camera:
             self.camera.update(self.player)
             
@@ -192,13 +227,26 @@ class Game:
             self.state = 'GAMEOVER'
 
     def draw(self):
-        if self.state == 'LOADING':
-            self.loading.draw()
+        # ЭКРАН ЗАГРУЗКИ БОССА
+        if self.state == 'LOADING' and self.boss_loading_started:
+            self.screen.fill((0, 0, 0))
+            now = pygame.time.get_ticks()
+            elapsed = int((now - self.loading_timer) / 1000)
+            remaining = max(0, 30 - elapsed)
+            
+            font = pygame.font.SysFont("Arial", 48)
+            text = font.render(f"ПРИБЛИЖЕНИЕ ГРЫЗУНА... {remaining}с", True, (255, 215, 0))
+            rect = text.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+            self.screen.blit(text, rect)
+            
+            hint = pygame.font.SysFont("Arial", 24).render("Совет: Его прыжок смертелен, используйте рывок (L-Shift)", True, (200, 200, 200))
+            self.screen.blit(hint, (WIDTH // 2 - 250, HEIGHT // 2 + 100))
+            pygame.display.flip()
             return
 
+        # ОБЫЧНАЯ ОТРИСОВКА
         self.screen.fill(self.stage_manager.get_bg_color())
 
-        # Отрисовка мира
         if self.state in ['PLAYING', 'PAUSE', 'GAMEOVER', 'CUTSCENE']:
             for sprite in self.all_sprites:
                 if self.camera:
@@ -207,7 +255,6 @@ class Game:
                     self.screen.blit(sprite.image, sprite.rect)
 
             if self.hud:
-                # Отрисовка HP босса (для Миноса, Сизифа или Хомяка)
                 for enemy in self.enemies:
                     if getattr(enemy, 'max_hp', 0) >= 500 and enemy.is_alive:
                         self.hud.draw_boss_hp(enemy)

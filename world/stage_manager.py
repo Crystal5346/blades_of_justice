@@ -106,37 +106,31 @@ class StageManager:
             boss = SisyphusBoss(WIDTH // 2, HEIGHT - 100, self.game.player, self.game)
             self.game.enemies.add(boss)
             self.game.all_sprites.add(boss)
-            # Золотистый песок для Сизифа
             for wall in self.game.walls:
                 if wall.rect.height == 100:
                     wall.image.fill((100, 80, 20))
 
+        # 3. ФИНАЛЬНЫЙ КОРИДОР
         elif name == "FinalCorridor":
-            self.current_stage = name
-            self.generators["Final"].generate(name) # Должен вызываться генератор!
-            # Камера должна знать ширину, которую задал генератор (6000)
-            self.game.init_camera(6000, HEIGHT)
-            
-            # Импортируем локально, как ты делал с Миносом
-            from characters.enemies.hamster import SmallHamster
-            
-            # Спавним сначала маленького хомяка (троллинг игрока)
-            boss = SmallHamster(WIDTH // 2, HEIGHT - 150, self.game.player)
-            boss.game = self.game
-            
-            self.game.enemies.add(boss)
-            self.game.all_sprites.add(boss)
-            print("SYSTEM: Финальная битва... началась?")
+            # Вызываем генератор (он сам создаст стены и Мини-Хомяка "Minster")
+            self.generators["Final"].generate("FinalCorridor")
+            # Уровни ширины берем из того, что прописал генератор
+            self.level_width = getattr(self.game, 'level_width', 6000)
+            print("SYSTEM: Коридор Суда развернут. Ожидание битвы со стражем.")
 
-        # 4. ВСЕ ОСТАЛЬНЫЕ УРОВНИ (Lust, Greed, Polygon, FinalCorridor)
+        # 4. ФИНАЛЬНАЯ АРЕНА (БОСС)
+        elif name == "FinalArena":
+            # Вызываем генератор арены (он создаст коробку и GigaHamster)
+            self.generators["Final"].generate("FinalArena")
+            self.level_width = WIDTH
+            print("SYSTEM: Золотая Арена готова. Грызун ждет.")
+
+        # 5. ВСЕ ОСТАЛЬНЫЕ УРОВНИ (Lust, Greed, Polygon)
         elif base in self.generators:
             self.generators[base].generate(name)
-            
-            # Корректировка ширины (если генератор сам её не поставил)
             if base == "Polygon": 
                 self.level_width = 2500
             else: 
-                # Берем ширину, которую установил генератор (напр. 5000 для коридора)
                 self.level_width = getattr(self.game, 'level_width', WIDTH)
 
         print(f"StageManager: Уровень '{name}' готов.")
