@@ -43,23 +43,10 @@ class Gabriel(Character):
         }
 
     def handle_input(self, event):
-        if self.game.camera and hasattr(self.game.camera, 'camera'):
-            world_mouse_x = mx - self.game.camera.camera.x
-        else:
-            world_mouse_x = mx # Фоллбек, если камеры нет
         """ОБРАБОТКА НАЖАТИЙ (Сюда переехал код из main.py)"""
         # Ближний бой (Левая кнопка мыши)
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            # Сначала всегда получаем координаты мыши
-            mx, my = pygame.mouse.get_pos() 
-            
-            # Теперь делаем расчеты с камерой, только если она есть
-            if self.game.camera and hasattr(self.game.camera, 'camera'):
-                world_mouse_x = mx - self.game.camera.camera.x
-                world_mouse_y = my - self.game.camera.camera.y
-            else:
-                # Фоллбек: если камеры нет, используем экранные координаты
-                world_mouse_x, world_mouse_y = mx, my
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            self.game.combat_system.process_melee_attack(self, self.game.enemies)
         
         # Способности (E и Q)
         if event.type == pygame.KEYDOWN:
