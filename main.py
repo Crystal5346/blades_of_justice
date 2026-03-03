@@ -46,39 +46,33 @@ class Game:
         self.camera = Camera(width, height)
         return self.camera
 
-    def init_world(self, stage_name="Lust 1-1"):
-        """Полная инициализация игрового пространства"""
-        # 1. Загрузка характеристик
-        saved_stats = self.db.get_player_stats(self.current_slot) if self.current_slot else None
+    def init_world(self, stage_name="Polygon"):
+        self.state = 'LOADING'
+        
+        # 1. Очистка старого мира
+        self.all_sprites.empty()
+        self.walls.empty()
+        self.enemies.empty()
 
+        # 2. Игрок
         if self.player is None:
             self.player = Gabriel(100, 100)
             self.player.game = self
         
-        if saved_stats:
-            self.player.level = saved_stats.get('level', 1)
-            self.player.max_hp = saved_stats.get('max_hp', 100)
-            self.player.hp = saved_stats.get('hp', self.player.max_hp)
-            if hasattr(self.player, 'max_mp'):
-                self.player.max_mp = saved_stats.get('max_mp', 100)
-                self.player.mp = saved_stats.get('mp', self.player.max_mp)
-            
-            if hasattr(self.player, 'refresh_abilities'):
-                self.player.refresh_abilities()
-        
-        # 2. Очистка и развертывание уровня через StageManager
-        # StageManager сам вызовет генератор и настроит self.camera
+        # 3. Загрузка уровня (Создание стен)
         self.stage_manager.load_stage(stage_name)
 
-        # 3. Привязка интерфейса
-        self.hud = HUD(self.screen, self.player)
+        # 4. СТОП-КРАН для падения
+        # Ставим игрока в координаты, где ТОЧНО есть пол (HEIGHT - 100)
+        self.player.rect.x = 200
+        self.player.rect.y = HEIGHT - 300 
+        self.player.vel_y = 0 # Сбрасываем накопленную скорость падения
         
-        # 4. Сброс состояния боя
-        if hasattr(self.combat_system, 'projectiles'):
-            self.combat_system.projectiles.empty()
+        # 5. Принудительный рендер камеры, чтобы она не смотрела в (0,0)
+        if self.camera:
+            self.camera.update(self.player)
 
         self.state = 'PLAYING'
-        print(f"SYSTEM: Мир {stage_name} инициализирован успешно.")
 
     def handle_events(self):
         for event in pygame.event.get():

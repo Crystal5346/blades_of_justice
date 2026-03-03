@@ -111,9 +111,11 @@ class StageManager:
                 if wall.rect.height == 100:
                     wall.image.fill((100, 80, 20))
 
-        # 3. ФИНАЛЬНАЯ АРЕНА (ГигаХомяк)
-        elif name == "FinalArena":
-            self.generators["Final"].generate(name)
+        elif name == "FinalCorridor":
+            self.current_stage = name
+            self.generators["Final"].generate(name) # Должен вызываться генератор!
+            # Камера должна знать ширину, которую задал генератор (6000)
+            self.game.init_camera(6000, HEIGHT)
             
             # Импортируем локально, как ты делал с Миносом
             from characters.enemies.hamster import SmallHamster
@@ -140,16 +142,13 @@ class StageManager:
         print(f"StageManager: Уровень '{name}' готов.")
 
     def clear_world(self):
-        # Очищаем все группы
         self.game.enemies.empty()
         self.game.walls.empty()
         self.game.all_sprites.empty()
-        
-        # Возвращаем игрока в мир!
         if self.game.player:
             self.game.all_sprites.add(self.game.player)
-            # Сбрасываем позицию игрока на старт уровня
-            self.game.player.rect.topleft = (100, 100) 
+            # Ставим игрока чуть выше пола (пол на HEIGHT-100)
+            self.game.player.rect.topleft = (150, HEIGHT - 250) 
             self.game.player.vel_y = 0
 
     def _generate_boss_arena(self):

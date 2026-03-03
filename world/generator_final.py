@@ -98,6 +98,7 @@ class FinalGenerator:
         self.game.exit_gate = gate
 
     def _build_arena(self):
+        self.game.walls.empty() # На всякий случай
         """Золотой Колизей для битвы с ГигаХомяком"""
         self.game.level_width = WIDTH
         self.game.init_camera(WIDTH, HEIGHT)
