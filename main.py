@@ -6,12 +6,11 @@ from config import *
 from characters.gabriel import Gabriel
 from combat.damage_system import CombatSystem
 from world.stage_manager import StageManager
-from core.camera import Camera
 from core.database import Database
 from ui.hud import HUD
 from ui.menus import GameMenus
+from core.camera import Camera
 from ui.loading_screen import LoadingScreen
-from core.save_manager import SaveManager
 
 class Game:
     def __init__(self):
@@ -26,7 +25,6 @@ class Game:
         # --- СИСТЕМЫ ---
         self.db = Database()
         self.menus = GameMenus(self.screen)
-        self.save_manager = SaveManager(self.db)
         self.loading = LoadingScreen(self.screen, self.menus)
         self.stage_manager = StageManager(self)
         self.combat_system = CombatSystem(self)
@@ -41,9 +39,7 @@ class Game:
         self.hud = None
         self.camera = None
         self.enemies = pygame.sprite.Group()
-        self.mini_hamster_dead = False
         self.boss_loading_started = False
-        self.loading_timer = 0
         self.all_sprites = pygame.sprite.Group()
         self.walls = pygame.sprite.Group()
 
@@ -76,6 +72,8 @@ class Game:
         self.all_sprites.empty()
         self.walls.empty()
         self.enemies.empty()
+        self.mini_hamster_dead = False
+        self.boss_loading_started = False
 
         # 3. Возвращаем нашего (уже существующего или только что воскрешенного) игрока
         self.all_sprites.add(self.player)
@@ -206,23 +204,6 @@ class Game:
         # 3. ОБЫЧНОЕ СОСТОЯНИЕ ИГРЫ (PLAYING)
         keys = pygame.key.get_pressed()
 
-        # Проверка условий перехода на Арену
-        if self.stage_manager.current_stage == "FinalCorridor":
-            # Проверка смерти Мини-Хомяка
-            if not self.mini_hamster_dead:
-                minsters = [e for e in self.enemies if getattr(e, 'name', '') == "Minster"]
-                if not minsters: 
-                    self.mini_hamster_dead = True
-                    print("СИСТЕМА: Страж пал. Врата Арены разблокированы.")
-
-            # Проверка приближения к двери (если страж убит)
-            if self.mini_hamster_dead and not self.boss_loading_started:
-                if self.player.rect.x > 5750:
-                    self.boss_loading_started = True
-                    self.loading_timer = pygame.time.get_ticks()
-                    self.state = 'LOADING'
-                    print("СИСТЕМА: Подготовка Арены...")
-
         # Стандартное обновление спрайтов
         if self.player:
             self.player.update(keys) 
@@ -242,23 +223,6 @@ class Game:
 
     #Логика проверки: если объект — GigaHamster, вызывать его кастомный draw, иначе стандартный blit через камеру.
     def draw(self):
-        # ЭКРАН ЗАГРУЗКИ БОССА
-        if self.state == 'LOADING' and self.boss_loading_started:
-            self.screen.fill((0, 0, 0))
-            now = pygame.time.get_ticks()
-            elapsed = int((now - self.loading_timer) / 1000)
-            remaining = max(0, 30 - elapsed)
-            
-            font = pygame.font.SysFont("Arial", 48)
-            text = font.render(f"ПРИБЛИЖЕНИЕ ГРЫЗУНА... {remaining}с", True, (255, 215, 0))
-            rect = text.get_rect(center=(WIDTH // 2, HEIGHT // 2))
-            self.screen.blit(text, rect)
-            
-            hint = pygame.font.SysFont("Arial", 24).render("Совет: Его прыжок смертелен, используйте рывок (L-Shift)", True, (200, 200, 200))
-            self.screen.blit(hint, (WIDTH // 2 - 250, HEIGHT // 2 + 100))
-            pygame.display.flip()
-            return
-
         # ОБЫЧНАЯ ОТРИСОВКА
         self.screen.fill(self.stage_manager.get_bg_color())
 
