@@ -36,7 +36,8 @@ class DisappearingPlatform(pygame.sprite.Sprite):
             # 2. Проверка столкновения с Лучом (из группы projectiles)
             hits = pygame.sprite.spritecollide(self, self.game.combat_system.projectiles, False)
             for proj in hits:
-                if proj.damage > 30: # Только мощные атаки (как луч) ломают платформу
+                # Если в платформу влетел 'луч' (большой урон или размер)
+                if proj.damage >= 40: 
                     self.vanish()
 
     def vanish(self):
@@ -105,6 +106,13 @@ class FinalGenerator:
         """Создание Арены для битвы с Боссом"""
         self.game.level_width = WIDTH
         self.game.init_camera(WIDTH, HEIGHT)
+        
+        boss_platform = Wall(WIDTH//2 - 200, HEIGHT - 250, 400, 40, (200, 200, 200))
+        self.game.walls.add(boss_platform)
+        self.game.all_sprites.add(boss_platform)
+
+        # Спавним хомяка прямо на неё
+        boss = GigaHamster(WIDTH // 2, HEIGHT - 350, self.game.player, self.game)
         
         # 1. Пол (Золотой)
         floor = Wall(0, HEIGHT - 100, WIDTH, 100, (255, 215, 0))
