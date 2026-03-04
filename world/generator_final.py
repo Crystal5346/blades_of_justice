@@ -96,10 +96,6 @@ class FinalGenerator:
         self.game.enemies.add(monster)
         self.game.all_sprites.add(monster)
         print("SYSTEM: Страж 'Minster' (SmallHamster) заспавнен.")  # ТО САМОЕ ИМЯ ДЛЯ ОБНАРУЖЕНИЯ В main.py
-        monster.hp = 1000         # Сделаем его чуть крепче обычного моба
-        self.game.enemies.add(monster)
-        self.game.all_sprites.add(monster)
-        print("SYSTEM: Страж 'Minster' заспавнен в коридоре.")
 
         # 4. Финальные врата (Визуальный триггер)
         gate = Wall(length - 150, HEIGHT - 400, 100, 300, (255, 215, 0))

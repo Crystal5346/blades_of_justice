@@ -8,60 +8,73 @@ class Projectile(pygame.sprite.Sprite):
         self.game = game
         self.targets = targets
         self.damage = damage
-        self.pierce = pierce # Сохраняем для логики
+        self.pierce = pierce
         self.speed = speed
+        
+        # --- НОВОЕ: для пронизывающих снарядов ---
+        self.hit_targets = []      # Кого уже ударили (не бьём повторно)
+        self.max_pierce = 4        # Максимум целей
+        self.pierce_falloff = 0.7  # Множитель урона за каждое следующее попадание
         
         # Визуал
         self.image = pygame.Surface(size, pygame.SRCALPHA)
         if self.pierce:
-             # Рисуем копье/топор
              pygame.draw.rect(self.image, color, (0, size[1]//4, size[0], size[1]//2), border_radius=5)
         else:
-             # Рисуем валун/пулю
              pygame.draw.circle(self.image, color, (size[0]//2, size[1]//2), size[0]//2)
-             if size[0] > 30: # Доп. текстура для больших камней
+             if size[0] > 30:
                  pygame.draw.circle(self.image, (60, 60, 60), (size[0]//3, size[1]//3), 5)
         
         self.rect = self.image.get_rect(center=(x, y))
         self.pos_x = float(x)
         self.pos_y = float(y)
-        
-        # Направление рассчитывается один раз при создании
         self.calculate_direction(target_pos)
 
     def calculate_direction(self, target_pos):
         angle = math.atan2(target_pos[1] - self.pos_y, target_pos[0] - self.pos_x)
         self.velocity_x = math.cos(angle) * self.speed
         self.velocity_y = math.sin(angle) * self.speed
-        
         if self.pierce:
             deg = math.degrees(-angle)
             self.image = pygame.transform.rotate(self.image, deg)
 
     def update(self):
-        # Движение
         self.pos_x += self.velocity_x
         self.pos_y += self.velocity_y
         self.rect.centerx = int(self.pos_x)
         self.rect.centery = int(self.pos_y)
 
-        # Коллизии
         hits = pygame.sprite.spritecollide(self, self.targets, False)
-        if hits:
-            for target in hits:
-                if hasattr(target, 'take_damage'):
-                    target.take_damage(self.damage)
-            # Если не пронзает — уничтожается. Валун Husk7 теперь всегда уничтожается.
-            if not self.pierce:
-                self.kill()
-                
-        # В Projectile.update
-        if hasattr(self, 'is_warning_phase') and self.is_warning_phase:
-            self.image.set_alpha(100) # Прозрачный
-        else:
-            self.image.set_alpha(255) # Опасный
+        for target in hits:
+            if not hasattr(target, 'take_damage'):
+                continue
 
-        # Удаление за границами
+            if self.pierce:
+                # Пропускаем тех, кого уже ударили
+                if target in self.hit_targets:
+                    continue
+                
+                # Считаем урон с ослаблением по позиции в очереди
+                falloff = self.pierce_falloff ** len(self.hit_targets)
+                actual_damage = int(self.damage * falloff)
+                target.take_damage(actual_damage)
+                self.hit_targets.append(target)
+                
+                # После 4 целей — копьё исчезает
+                if len(self.hit_targets) >= self.max_pierce:
+                    self.kill()
+                    return
+            else:
+                # Обычный снаряд — бьёт и исчезает
+                target.take_damage(self.damage)
+                self.kill()
+                return
+
+        if hasattr(self, 'is_warning_phase') and self.is_warning_phase:
+            self.image.set_alpha(100)
+        else:
+            self.image.set_alpha(255)
+
         if self.game:
             if not (-1000 < self.pos_x < self.game.stage_manager.level_width + 1000):
                 self.kill()

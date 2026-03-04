@@ -86,12 +86,12 @@ class GameMenus:
         overlay.fill((0, 0, 0, 180))
         self.screen.blit(overlay, (0, 0))
         mouse_pos = pygame.mouse.get_pos()
-        
-        self._draw_button("RESUME", 250, mouse_pos)
-        self._draw_button("SAVE GAME", 280, mouse_pos, custom_color=self.GOLD) # Выделим золотом
-        self._draw_button("RESTART", 330, mouse_pos)
-        self._draw_button("SETTINGS", 410, mouse_pos)
-        self._draw_button("QUIT TO MENU", 490, mouse_pos)
+
+        self._draw_button("RESUME",       250, mouse_pos)
+        self._draw_button("SAVE GAME",    330, mouse_pos, custom_color=self.GOLD)
+        self._draw_button("RESTART",      410, mouse_pos)
+        self._draw_button("SETTINGS",     490, mouse_pos)
+        self._draw_button("QUIT TO MENU", 570, mouse_pos)
 
     def _get_slot_text(self, slot_key, index):
         """Вспомогательный метод для генерации текста кнопки (нужен для ширины Rect)"""
@@ -150,13 +150,13 @@ class GameMenus:
                 if self._get_button_rect("BACK", 650).collidepoint(m_pos): self.state = "MAIN"
 
             elif self.state == "PAUSE":
-                if self._get_button_rect("RESUME", 200).collidepoint(m_pos): return "RESUME"
-                if self._get_button_rect("SAVE GAME", 280).collidepoint(m_pos): return "SAVE_PROGRESS"
-                if self._get_button_rect("RESTART", 360).collidepoint(m_pos): return "RESTART"
-                if self._get_button_rect("SETTINGS", 410).collidepoint(m_pos):
+                if self._get_button_rect("RESUME",       250).collidepoint(m_pos): return "RESUME"
+                if self._get_button_rect("SAVE GAME",    330).collidepoint(m_pos): return "SAVE_PROGRESS"
+                if self._get_button_rect("RESTART",      410).collidepoint(m_pos): return "RESTART"
+                if self._get_button_rect("SETTINGS",     490).collidepoint(m_pos):
                     self.previous_state = "PAUSE"
                     self.state = "SETTINGS"
-                if self._get_button_rect("QUIT TO MENU", 490).collidepoint(m_pos): return "TO_MENU"
+                if self._get_button_rect("QUIT TO MENU", 570).collidepoint(m_pos): return "TO_MENU"
 
             elif self.state == "SETTINGS":
                 if self._get_button_rect("BACK", 550).collidepoint(m_pos):

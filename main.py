@@ -103,6 +103,13 @@ class Game:
                 elif self.state == 'PAUSE':
                     self.state = 'PLAYING'
                     self.menus.state = 'NONE'
+                    
+            if self.state == 'GAMEOVER':
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_r:
+                        self.process_menu_action("RESTART")
+                    elif event.key == pygame.K_m:
+                        self.process_menu_action("TO_MENU")
 
             if self.state in ['MENU', 'PAUSE', 'CUTSCENE', 'GAMEOVER']:
                 action = self.menus.handle_input(event)
@@ -143,6 +150,9 @@ class Game:
 
         elif action == "RESTART":
             self.state = 'LOADING'
+            if self.player:
+                self.player.hp = self.player.max_hp  # сбрасываем HP до рестарта
+                self.player.is_alive = True
             self.init_world(self.stage_manager.current_stage)
 
         elif action == "TO_MENU":
@@ -227,7 +237,7 @@ class Game:
         self.combat_system.enemy_attack_logic()
         self.stage_manager.update()
 
-        if self.player and self.player.hp <= 0:
+        if self.player and self.player.hp <= 0 and self.state == 'PLAYING': 
             self.state = 'GAMEOVER'
 
     #Логика проверки: если объект — GigaHamster, вызывать его кастомный draw, иначе стандартный blit через камеру.
@@ -293,8 +303,14 @@ class Game:
             overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
             overlay.fill((100, 0, 0, 150))
             self.screen.blit(overlay, (0, 0))
+    
             text = self.menus.font_big.render("JUDGMENT", True, (255, 0, 0))
-            self.screen.blit(text, text.get_rect(center=(WIDTH // 2, HEIGHT // 2)))
+            self.screen.blit(text, text.get_rect(center=(WIDTH // 2, HEIGHT // 2 - 60)))
+    
+            hint = self.menus.small_font.render(
+                "R — перезапустить    M — главное меню", True, (220, 220, 220)
+            )
+            self.screen.blit(hint, hint.get_rect(center=(WIDTH // 2, HEIGHT // 2 + 40)))
 
     def quit_game(self):
         if self.player and self.current_slot:
