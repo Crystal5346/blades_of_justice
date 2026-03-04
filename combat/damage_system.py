@@ -67,10 +67,12 @@ class Projectile(pygame.sprite.Sprite):
                 self.kill()
 
 class CombatSystem:
+    #инициализация группы projectiles для регистрации всех снарядов.
     def __init__(self, game):
         self.game = game
         self.projectiles = pygame.sprite.Group()
 
+    #логика создания снаряда, установка его типа (копье/пуля) и добавление в группы отслеживания.
     def spawn_projectile(self, pos, target_pos, damage, is_spear=False, targets=None, color=None, size=(25, 25)):
         """Стандартный снаряд для Габриэля и мелких врагов"""
         x, y = pos

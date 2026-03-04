@@ -17,6 +17,7 @@ class DisappearingPlatform(pygame.sprite.Sprite):
         self.respawn_delay = 300 # 5 секунд на восстановление
         self.life_timer = random.randint(200, 400) # Время жизни платформы (3-6 сек)
 
+    #проверка коллизий с игроком и снарядами (лучами) для запуска разрушения.
     def update(self):
         if not self.active:
             self.timer -= 1
@@ -40,6 +41,7 @@ class DisappearingPlatform(pygame.sprite.Sprite):
                 if proj.damage >= 40: 
                     self.vanish()
 
+    #процесс деактивации платформы и запуска таймера восстановления.
     def vanish(self):
         if self.active:
             self.active = False
@@ -47,6 +49,7 @@ class DisappearingPlatform(pygame.sprite.Sprite):
             self.game.walls.remove(self)
             self.game.all_sprites.remove(self)
 
+    #логика возрождения платформы.
     def reset_platform(self):
         self.active = True
         self.life_timer = random.randint(200, 400)

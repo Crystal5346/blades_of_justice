@@ -16,8 +16,11 @@ from core.save_manager import SaveManager
 class Game:
     def __init__(self):
         pygame.init()
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
-        pygame.display.set_caption("ULTRAKILL: GABRIEL'S JUDGMENT")
+        self.screen = pygame.display.set_mode(
+            (WIDTH, HEIGHT), 
+            pygame.FULLSCREEN | pygame.SCALED | pygame.DOUBLEBUF
+        )
+        pygame.display.set_caption("Blades of Justice")
         self.clock = pygame.time.Clock()
 
         # --- СИСТЕМЫ ---
@@ -165,6 +168,7 @@ class Game:
         }
         self.db.save_game(self.current_slot, stats_to_save)
 
+    #В цикле обновления спрайтов стоит добавить коммент про вызов ИИ врагов.
     def update(self):
         # 1. Если идет загрузка босса — считаем таймер
         if self.boss_loading_started and self.state == 'LOADING':
@@ -226,6 +230,7 @@ class Game:
         if self.player and self.player.hp <= 0:
             self.state = 'GAMEOVER'
 
+    #Логика проверки: если объект — GigaHamster, вызывать его кастомный draw, иначе стандартный blit через камеру.
     def draw(self):
         # ЭКРАН ЗАГРУЗКИ БОССА
         if self.state == 'LOADING' and self.boss_loading_started:

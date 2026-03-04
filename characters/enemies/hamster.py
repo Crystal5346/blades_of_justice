@@ -5,8 +5,8 @@ from config import WIDTH, HEIGHT
 
 class SmallHamster(Enemy):
     """
-    Малый Хомяк: 'Ложный' босс[cite: 945]. 
-    Умирает с одного удара, запуская истинную битву[cite: 947].
+    Класс 'ложного' босса. Маленький хомяк, который провоцирует игрока.
+    Смерть этого объекта триггерит появление истинной формы босса.
     """
     def __init__(self, x, y, player, game=None):
         super().__init__(x, y, 1, 0, 2, 1, player)
@@ -22,6 +22,7 @@ class SmallHamster(Enemy):
         if abs(dist_x) > 5:
             self.rect.x += self.speed if dist_x > 0 else -self.speed
 
+    """При смерти спавнит настоящего Громовержца Ада"""
     def die(self):
         print("СИСТЕМА: Истинный облик врага раскрыт!")
         from characters.enemies.hamster import GigaHamster
@@ -32,7 +33,12 @@ class SmallHamster(Enemy):
             self.game.all_sprites.add(big_boss)
         super().die()
 
+    """
+    Истинный финальный босс: Святой Хомяк.
+    Обладает огромным запасом HP, умеет прыгать, перекатываться и жечь лучом.
+    """
 class GigaHamster(Enemy):
+    #настройка характеристик (HP, скорость) и параметров луча.
     def __init__(self, x, y, player, game=None):
         # HP=5000, Скорость=4 
         super().__init__(x, y, 5000, 1000, 4, 20, player)
@@ -44,11 +50,11 @@ class GigaHamster(Enemy):
         pygame.draw.rect(self.image, (255, 215, 0), (0, 0, 250, 250), border_radius=20)
         self.rect = self.image.get_rect(center=(x, y))
         
-        self.is_boss = True
-        self.vel_y = 0
+        self.is_boss = True # Флаг для UI
+        self.vel_y = 0      # Вертикальная скорость для гравитации
         self.attack_timer = 0
-        self.current_action = "IDLE"
-        self.action_duration = 0
+        self.current_action = "IDLE" # Текущее состояние (отдых/атака)
+        self.action_duration = 0      # Сколько кадров длится текущая атака
         
         # Параметры Святого Луча 
         self.beam_active = False
@@ -69,12 +75,12 @@ class GigaHamster(Enemy):
                 self.vel_y = 0
 
     def ai_behavior(self):
-        self.apply_gravity()
+        self.apply_gravity() # Босс всегда подвластен гравитации
 
         if self.beam_active:
             self.update_beam()
             return # Во время луча босс не двигается
-
+        # Если активен луч — блокируем другие действия
         self.attack_timer += 1
         
         if self.current_action == "IDLE":
@@ -89,10 +95,11 @@ class GigaHamster(Enemy):
                 self.start_attack()
         
         elif self.current_action == "ROLL":
-            self.perform_roll()
+            self.perform_roll() # Логика переката
         elif self.current_action == "JUMP":
-            self.perform_jump()
+            self.perform_jump() # Логика прыжка
 
+        # Уменьшаем время действия атаки
         if self.action_duration > 0:
             self.action_duration -= 1
             if self.action_duration <= 0:
