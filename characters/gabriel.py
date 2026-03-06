@@ -4,23 +4,16 @@ from .character import Character
 
 class Gabriel(Character):
     def __init__(self, x, y):
-        # Начальные характеристики (Уровень 1)
-        # HP и MP по 10000 как в твоем коде
         super().__init__(x, y, hp=10000, mp=10000, speed=25) 
         self.level = 1
-        self.image.fill((255, 215, 0)) # Золотой Габриэль
+        self.image.fill((255, 215, 0))
         
-        # Регенерация ресурсов (согласно ТЗ)
         self.mana_regen_speed = 0.05 
-        
-        # Оружие
         self.unlocked_weapons = ["Blades"]
 
-        # --- СИСТЕМА ПРОГРЕССИИ ---
         self.exp = 0
         self.exp_to_next_level = 100
 
-        # --- НАСТРОЙКИ РЫВКА (DASH) ---
         self.is_dashing = False
         self.dash_speed = 22
         self.dash_duration = 150 
@@ -30,7 +23,6 @@ class Gabriel(Character):
         self.is_invulnerable = False 
 
     def get_hud_data(self):
-        """Данные для интерфейса (HP, MP, LVL, EXP)"""
         return {
             "hp": self.hp,
             "max_hp": self.max_hp,
@@ -43,15 +35,11 @@ class Gabriel(Character):
         }
 
     def handle_input(self, event):
-        """ОБРАБОТКА НАЖАТИЙ (Сюда переехал код из main.py)"""
-        # Ближний бой (Левая кнопка мыши)
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
             self.game.combat_system.process_melee_attack(self, self.game.enemies)
         
-        # Способности (E и Q)
         if event.type == pygame.KEYDOWN:
             mx, my = pygame.mouse.get_pos()
-            # Учет смещения камеры для точного прицеливания
             world_mouse_x = mx - self.game.camera.camera.x
             
             if event.key == pygame.K_e:
@@ -74,7 +62,7 @@ class Gabriel(Character):
         self.max_mp += 10
         self.mp = self.max_mp
         
-        self.refresh_abilities() # Обновляем список оружия
+        self.refresh_abilities()
         print(f"Level Up! Current Level: {self.level}")
 
     def dash(self):
@@ -99,7 +87,6 @@ class Gabriel(Character):
 
         now = pygame.time.get_ticks()
 
-        # 1. ЛОГИКА РЫВКА
         if self.is_dashing:
             if now - self.dash_start_time < self.dash_duration:
                 dx = self.dash_speed if self.direction == "right" else -self.dash_speed
@@ -109,11 +96,9 @@ class Gabriel(Character):
                 self.is_dashing = False
                 self.is_invulnerable = False
 
-        # 2. АКТИВАЦИЯ РЫВКА (Зажатая клавиша)
         if keys[pygame.K_LSHIFT]:
             self.dash()
 
-        # 3. ОБЫЧНОЕ ДВИЖЕНИЕ
         dx = 0
         if keys[pygame.K_a]: 
             dx = -self.speed
@@ -122,19 +107,18 @@ class Gabriel(Character):
             dx = self.speed
             self.direction = "right"
 
-        # 4. ПОЛЕТ И ГРАВИТАЦИЯ
         self.vel_y += self.gravity
         flying = False
         
         if keys[pygame.K_SPACE]:
             if self.mp > 0:
-                self.mp -= 0.6 # Расход маны
+                self.mp -= 0.6
                 if self.vel_y > -6: self.vel_y -= 1.8 
                 flying = True
                 self.on_ground = False
             else:
                 if self.vel_y < 0: self.vel_y = 0 
-                if self.vel_y > 3: self.vel_y = 3 # Планирование
+                if self.vel_y > 3: self.vel_y = 3
         
         if keys[pygame.K_w] and self.on_ground:
             self.vel_y = self.jump_power
@@ -143,12 +127,10 @@ class Gabriel(Character):
         if not keys[pygame.K_SPACE] and self.vel_y > 15:
             self.vel_y = 15
 
-        # 5. РЕГЕНЕРАЦИЯ МАНЫ
         if not flying and self.mp < self.max_mp:
             self.mp += self.mana_regen_speed
             if self.mp > self.max_mp: self.mp = self.max_mp 
 
-        # 6. КОЛЛИЗИИ
         self.check_world_collisions(self.game.walls, dx, self.vel_y)
 
     def cast_axe(self, combat_system, mouse_pos):
@@ -166,7 +148,6 @@ class Gabriel(Character):
             print("Level too low for Holy Spear!")
             
     def refresh_abilities(self):
-        """Синхронизирует список доступного оружия с уровнем"""
         if "Blades" not in self.unlocked_weapons:
             self.unlocked_weapons.append("Blades")
         if self.level >= 2 and "Holy Axes" not in self.unlocked_weapons:

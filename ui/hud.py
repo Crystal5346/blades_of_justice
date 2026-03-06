@@ -1,121 +1,148 @@
+"""
+ui/hud.py — Крупный красивый HUD для Blades of Justice.
+HP / MP / EXP — широкие полоски с блик-эффектом.
+Уровень и оружие — под полосками.
+Полоска HP босса — вверху по центру с пульсацией при низком HP.
+"""
 import pygame
-from config import WIDTH
+import math
+from config import WIDTH, HEIGHT
+from ui.localization import t
+
+
+def _rounded_bar(surf, x, y, w, h, ratio, bg, fill, border, r=6):
+    ratio  = max(0.0, min(1.0, ratio))
+    fill_w = max(0, int(w * ratio))
+    pygame.draw.rect(surf, bg,     (x, y, w,      h), border_radius=r)
+    if fill_w > 0:
+        pygame.draw.rect(surf, fill,   (x, y, fill_w, h), border_radius=r)
+        # Блик сверху
+        pygame.draw.rect(surf, (255, 255, 255),
+                         (x + 2, y + 2, fill_w - 4, max(1, h // 5)),
+                         border_radius=r)
+    pygame.draw.rect(surf, border, (x, y, w,      h), 1, border_radius=r)
+
 
 class HUD:
+    # Цвета полосок
+    HP_FILL  = (210,  38,  38)
+    HP_BG    = ( 48,   8,   8)
+    MP_FILL  = ( 28, 100, 215)
+    MP_BG    = (  8,  18,  48)
+    EXP_FILL = ( 42, 195,  62)
+    EXP_BG   = (  8,  32,  10)
+    BORDER   = ( 75,  75,  88)
+    GOLD     = (255, 215,   0)
+    WHITE    = (232, 232, 232)
+    GRAY     = (135, 135, 148)
+    PANEL_BG = ( 10,  10,  16, 185)
+
+    BAR_W = 290
+    BAR_H =  23
+    PX    =  18   # отступ X
+    PY    =  16   # отступ Y
+
     def __init__(self, screen, player):
         self.screen = screen
         self.player = player
-        self.name = "Царь Сизиф"
-        self.name = "Царь Минос"
-        
-        # Шрифты
-        self.font_main = pygame.font.SysFont("Arial", 20, bold=True)
-        self.font_small = pygame.font.SysFont("Arial", 14, bold=True)
+        self.f_lbl    = pygame.font.Font(None, 13)
+        self.f_val    = pygame.font.Font(None, 13)
+        self.f_lvl    = pygame.font.Font(None, 18)
+        self.f_weapon = pygame.font.Font(None, 16)
+        self.f_bname  = pygame.font.Font(None, 22)
+        self.f_bval   = pygame.font.Font(None, 14)
 
-        # Размеры полосок
-        self.bar_width = 250
-        self.bar_height = 20
-        self.x_offset = 20
-        self.y_offset = 20
+    # --- фоновая панель ---
+    def _panel(self, x, y, w, h):
+        s = pygame.Surface((w, h), pygame.SRCALPHA)
+        s.fill(self.PANEL_BG)
+        pygame.draw.rect(s, (52, 52, 64, 190), (0, 0, w, h), 1, border_radius=7)
+        self.screen.blit(s, (x, y))
 
-    def draw_bar(self, x, y, current, maximum, color, label):
-        """Универсальный метод для рисования полоски с рамкой и текстом"""
-        # Рассчитываем ширину заполнения
-        fill_width = int((current / maximum) * self.bar_width)
-        
-        # Фон полоски (темный)
-        pygame.draw.rect(self.screen, (40, 40, 40), (x, y, self.bar_width, self.bar_height))
-        
-        # Заполнение (сама полоска)
-        if fill_width > 0:
-            # Рисуем основной цвет
-            pygame.draw.rect(self.screen, color, (x, y, fill_width, self.bar_height))
-            # Добавляем светлую полоску сверху для эффекта объема
-            pygame.draw.rect(self.screen, (255, 255, 255), (x, y, fill_width, 2), 1)
+    # --- полоска с подписью ---
+    def _bar(self, x, y, cur, mx, label, fill, bg):
+        lbl = self.f_lbl.render(label, True, self.GRAY)
+        self.screen.blit(lbl, (x, y))
+        by  = y + lbl.get_height() + 3
+        _rounded_bar(self.screen, x, by, self.BAR_W, self.BAR_H,
+                     cur / mx if mx else 0, bg, fill, self.BORDER)
+        val = self.f_val.render(f"{int(cur)} / {int(mx)}", True, self.WHITE)
+        self.screen.blit(val, val.get_rect(midleft=(x + 8, by + self.BAR_H // 2)))
+        return by + self.BAR_H   # нижняя граница
 
-        # Рамка
-        pygame.draw.rect(self.screen, (200, 200, 200), (x, y, self.bar_width, self.bar_height), 2)
-
-        # Текст (Название и значения)
-        text_surf = self.font_small.render(f"{label}: {int(current)}/{int(maximum)}", True, (255, 255, 255))
-        self.screen.blit(text_surf, (x + 5, y + 2))
-        
-    def draw_boss_hp(self, boss):
-        bar_width = 700
-        bar_height = 25
-        x = WIDTH // 2 - bar_width // 2
-        y = 40
-        
-        # --- ОПРЕДЕЛЕНИЕ СТИЛЯ ---
-        boss_name = boss.name.upper() if hasattr(boss, 'name') else "БОСС"
-        
-        # По умолчанию (Минос)
-        hp_color = (100, 149, 237)  # Синий
-        bg_color = (20, 20, 40)
-        frame_color = (200, 200, 200)
-
-        if "СИЗИФ" in boss_name:
-            phase = getattr(boss, 'phase', 1)
-            hp_color = (218, 165, 32) if phase == 1 else (255, 69, 0)
-            bg_color = (60, 40, 0)
-            frame_color = (255, 215, 0)
-        
-        # НОВОЕ: Стиль для ГигаХомяка
-        elif "ХОМЯК" in boss_name or "GIGA" in boss_name:
-            hp_color = (255, 215, 0)    # Ярко-золотой
-            bg_color = (139, 69, 19)   # Коричневый подшерсток
-            frame_color = (255, 255, 255) # Белый мрамор
-            boss_name = "ВЕЛИКИЙ СВЯТОЙ ХОМЯК"
-
-        # --- ОТРИСОВКА ---
-        # Тень
-        pygame.draw.rect(self.screen, (10, 10, 10), (x - 4, y - 4, bar_width + 8, bar_height + 8))
-        pygame.draw.rect(self.screen, bg_color, (x, y, bar_width, bar_height))
-
-        # Текущее HP
-        hp_ratio = max(0, boss.hp / boss.max_hp)
-        if hp_ratio > 0:
-            pygame.draw.rect(self.screen, hp_color, (x, y, int(bar_width * hp_ratio), bar_height))
-            # Эффект блеска
-            pygame.draw.rect(self.screen, (255, 255, 255), (x, y, int(bar_width * hp_ratio), 2), 0)
-
-        # Рамка
-        pygame.draw.rect(self.screen, frame_color, (x, y, bar_width, bar_height), 2)
-
-        # Текст
-        font = pygame.font.SysFont("Georgia", 24, bold=True)
-        name_surf = font.render(boss_name, True, (255, 255, 255))
-        self.screen.blit(name_surf, (WIDTH // 2 - name_surf.get_width() // 2, y - 35))
-
-        hp_text = self.font_small.render(f"{int(boss.hp)} / {int(boss.max_hp)}", True, (255, 255, 255))
-        self.screen.blit(hp_text, (WIDTH // 2 - hp_text.get_width() // 2, y + 4))
-
+    # ----------------------------------------------------------------
     def draw(self):
-        # 1. Получаем свежие данные от игрока
         data = self.player.get_hud_data()
+        x, y = self.PX, self.PY
 
-        # 2. Отрисовка HP (Здоровье) - Красный
-        self.draw_bar(self.x_offset, self.y_offset, data["hp"], data["max_hp"], (200, 30, 30), "HP")
+        ph = 232 + len(data["weapons"]) * 21
+        self._panel(x - 7, y - 7, self.BAR_W + 18, ph)
 
-        # 3. Отрисовка MP (Мана) - Синий
-        self.draw_bar(self.x_offset, self.y_offset + 30, data["mp"], data["max_mp"], (30, 100, 200), "MP")
+        b = self._bar(x, y, data["hp"], data["max_hp"], "HP",
+                      self.HP_FILL, self.HP_BG)
+        b = self._bar(x, b + 11, data["mp"], data["max_mp"], "MP",
+                      self.MP_FILL, self.MP_BG)
+        b = self._bar(x, b + 11, data["exp"], max(data["exp_to_next"], 1), "EXP",
+                      self.EXP_FILL, self.EXP_BG)
 
-        # 4. Отрисовка Уровня и Опыта
-        level_text = self.font_main.render(f"LVL: {data['lvl']}", True, (255, 215, 0))
-        self.screen.blit(level_text, (self.x_offset, self.y_offset + 60))
+        lvl = self.f_lvl.render(f"{t('hud_lvl')}  {data['lvl']}", True, self.GOLD)
+        self.screen.blit(lvl, (x, b + 9))
 
-        # Полоска опыта (под уровнем)
-        exp_width = int((data["exp"] / (100 * data["lvl"])) * 100)
-        pygame.draw.rect(self.screen, (40, 40, 40), (self.x_offset + 80, self.y_offset + 68, 100, 8))
-        pygame.draw.rect(self.screen, (50, 200, 50), (self.x_offset + 80, self.y_offset + 68, exp_width, 8))
-        pygame.draw.rect(self.screen, (150, 150, 150), (self.x_offset + 80, self.y_offset + 68, 100, 8), 1)
+        wy = b + lvl.get_height() + 16
+        wl = self.f_weapon.render(t("hud_weapons") + ":", True, self.GRAY)
+        self.screen.blit(wl, (x, wy))
+        wy += wl.get_height() + 5
 
-        # 5. Индикатор разблокированного оружия (справа внизу)
-        y_weapon = 110
-        weapon_label = self.font_small.render("WEAPONS:", True, (180, 180, 180))
-        self.screen.blit(weapon_label, (self.x_offset, self.y_offset + 90))
-        
-        for weapon in data["weapons"]:
-            w_text = self.font_small.render(f"• {weapon}", True, (255, 255, 255))
-            self.screen.blit(w_text, (self.x_offset + 10, self.y_offset + y_weapon))
-            y_weapon += 18
+        for i, weapon in enumerate(data["weapons"]):
+            col  = self.GOLD if i == len(data["weapons"]) - 1 else self.WHITE
+            ws   = self.f_weapon.render(f"  ›  {weapon}", True, col)
+            self.screen.blit(ws, (x + 4, wy))
+            wy  += ws.get_height() + 3
+
+    # ----------------------------------------------------------------
+    def draw_boss_hp(self, boss):
+        BW, BH = 700, 27
+        bx = WIDTH  // 2 - BW // 2
+        by = 38
+
+        name  = boss.name.upper() if hasattr(boss, "name") else "BOSS"
+        hcol  = ( 75, 125, 228)
+        bgcol = ( 10,  10,  32)
+        fcol  = (115, 115, 158)
+
+        if "СИЗИФ" in name:
+            ph    = getattr(boss, "phase", 1)
+            hcol  = (208, 158,  18) if ph == 1 else (225, 52, 0)
+            bgcol = ( 38,  25,   0)
+            fcol  = (255, 215,   0)
+        elif "ХОМЯК" in name or "GIGA" in name:
+            hcol  = (255, 215,   0)
+            bgcol = ( 75,  38,   5)
+            fcol  = (255, 255, 255)
+            name  = "ВЕЛИКИЙ СВЯТОЙ ХОМЯК"
+        elif "МИНОС" in name or "MINOS" in name:
+            hcol  = ( 88,  38, 198)
+            bgcol = ( 18,   4,  38)
+            fcol  = (155,  75, 255)
+
+        # Панель
+        panel = pygame.Surface((BW + 24, BH + 58), pygame.SRCALPHA)
+        panel.fill((4, 4, 10, 195))
+        self.screen.blit(panel, (bx - 12, by - 32))
+
+        # Имя
+        ns = self.f_bname.render(name, True, (228, 228, 228))
+        self.screen.blit(ns, ns.get_rect(center=(WIDTH // 2, by - 14)))
+
+        ratio = max(0.0, boss.hp / boss.max_hp)
+        _rounded_bar(self.screen, bx, by, BW, BH, ratio, bgcol, hcol, fcol, r=5)
+
+        # Пульсация при низком HP
+        if ratio < 0.25:
+            p = int(55 + 38 * math.sin(pygame.time.get_ticks() * 0.008))
+            gl = pygame.Surface((BW, BH), pygame.SRCALPHA)
+            gl.fill((*hcol, p))
+            self.screen.blit(gl, (bx, by))
+
+        ht = self.f_bval.render(f"{int(boss.hp)} / {int(boss.max_hp)}", True, (218, 218, 218))
+        self.screen.blit(ht, ht.get_rect(center=(WIDTH // 2, by + BH // 2)))
